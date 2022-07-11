@@ -71,7 +71,7 @@ end
 @external
 func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         attempt_id : felt,
-        power : felt,
+        swing_power : felt,
         direction : SwingDirection
     ) -> (new_loc : Location):
     alloc_locals
@@ -87,7 +87,7 @@ func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     
     _assert_attempt_not_finished(last_loc=last_loc)
 
-    let (new_loc) = _physics_engine(last_loc=last_loc, power=power, unit_vector=direction)
+    let (new_loc) = _physics_engine(last_loc=last_loc, swing_power=swing_power, unit_vector=direction)
 
     # increase swing count
     swings.write(player_attempt_key, swing_cnt + 1)
@@ -162,13 +162,13 @@ end
 # TODO refactor as @contract_interface
 func _physics_engine{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         last_loc : Location,
-        power : felt,
+        swing_power : felt,
         unit_vector : SwingDirection
     ) -> (new_loc : Location):
 
-    let x = last_loc.x + power
-    let y = last_loc.y + power
-    let z = last_loc.z + power
+    let x = last_loc.x + swing_power
+    let y = last_loc.y + swing_power
+    let z = last_loc.z + swing_power
 
     return (Location(x=x, y=y, z=z))
 end
