@@ -87,6 +87,7 @@ func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     
     _assert_attempt_not_finished(last_loc=last_loc)
 
+    # let (unit_vector) = _force_unit_vector(raw_vector=direction)
     let (new_loc) = _physics_engine(last_loc=last_loc, power=power, unit_vector=direction)
 
     # increase swing count
@@ -157,6 +158,24 @@ func _get_last_location{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         let (last_loc) = ball_locations.read(PlayerSwing(addr=player_addr, attempt_id=attempt_id, swing_id=swing_cnt - 1))
         return (last_loc)
     end
+end
+
+func _force_unit_vector{range_check_ptr}(raw_vector : SwingDirection) -> (unit_vector : SwingDirection):
+    let sq_x = raw_vector.x * raw_vector.x
+    let sq_y = raw_vector.y * raw_vector.y
+    let sq_z = raw_vector.z * raw_vector.z
+
+    let (magnitude) = sqrt(sq_x + sq_y + sq_z)
+    %{ print("magnitude is " + str(ids.magnitude)) %}
+
+    let u_x = raw_vector.x / magnitude
+    let u_y = raw_vector.y / magnitude
+    let u_z = raw_vector.z / magnitude
+    %{ print("u_x is " + str(ids.u_x)) %}
+    %{ print("u_y is " + str(ids.u_y)) %}
+    %{ print("u_z is " + str(ids.u_z)) %}
+
+    return (SwingDirection(x=u_x, y=u_y, z=u_z))
 end
 
 # TODO refactor as @contract_interface

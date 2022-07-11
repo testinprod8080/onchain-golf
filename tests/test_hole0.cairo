@@ -1,5 +1,5 @@
 %lang starknet
-from src.hole0 import SwingDirection, get_attempt_info, get_hole_location, approach_tee, swing, _get_last_location
+from src.hole0 import SwingDirection, get_attempt_info, get_hole_location, approach_tee, swing, _get_last_location, _force_unit_vector
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import sqrt
 
@@ -69,6 +69,23 @@ func test_success_last_loc_is_tee{syscall_ptr : felt*, range_check_ptr, pedersen
     let (last_loc) = _get_last_location(player_addr=1234, attempt_id=0, swing_cnt=0)
     assert last_loc.x = 0
     assert last_loc.y = 0
+
+    return ()
+end
+
+# TEST - _force_unit_vector
+
+@external
+func test_success_get_unit_vector{syscall_ptr : felt*, range_check_ptr, pedersen_ptr : HashBuiltin*}():
+    let direction = SwingDirection(x=2, y=3, z=1)
+    let (unit_vector) = _force_unit_vector(raw_vector=direction)
+    let sq_x = unit_vector.x * unit_vector.x
+    let sq_y = unit_vector.y * unit_vector.y
+    let sq_z = unit_vector.z * unit_vector.z
+
+    # let (magnitude) = sqrt(sq_x + sq_y + sq_z)
+
+    # assert magnitude = 1
 
     return ()
 end
