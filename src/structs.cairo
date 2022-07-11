@@ -26,11 +26,6 @@ struct PlayerAttempt:
     member attempt_id : felt
 end
 
-struct AttemptInfo:
-    member swing_cnt : felt
-    member status : felt
-end
-
 struct PlayerSwing:
     member addr : felt
     member attempt_id : felt
