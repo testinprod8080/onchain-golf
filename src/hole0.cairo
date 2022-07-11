@@ -1,62 +1,9 @@
 %lang starknet
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_lt, assert_le
+from starkware.cairo.common.math import assert_lt, assert_le, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.alloc import alloc
-
-###########
-# CONSTANTS
-###########
-
-#######
-# ENUMS
-#######
-
-struct GolfClubEnum:
-    member ONECLUBTORULETHEMALL : felt
-    member DRIVER : felt
-    member WOOD : felt
-    member IRON : felt
-    member WEDGE : felt
-    member PUTTER : felt
-end
-
-struct AttemptStatusEnum:
-    member PLAYING : felt
-    member FINISHED : felt
-end
-
-#########
-# STRUCTS
-#########
-
-struct Location:
-    member x : felt
-    member y : felt
-    member z : felt
-end
-
-struct ShotDirection:
-    member x : felt
-    member y : felt
-    member z : felt
-end
-
-struct PlayerAttempt:
-    member addr : felt
-    member attempt_id : felt
-end
-
-struct AttemptInfo:
-    member shot_cnt : felt
-    member status : felt
-end
-
-struct PlayerShot:
-    member addr : felt
-    member attempt_id : felt
-    member shot_id : felt
-end
+from src.structs import Location, SwingDirection, PlayerAttempt, AttemptInfo, PlayerSwing
 
 ##############
 # STORAGE VARS
@@ -79,22 +26,15 @@ func attempts(player_attempt : PlayerAttempt) -> (info : AttemptInfo):
 end
 
 @storage_var
-func shots(player_shot : PlayerShot) -> (end_loc : Location):
+func swings(player_swing : PlayerSwing) -> (end_loc : Location):
 end
-
-#############
-# CONSTRUCTOR
-#############
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
     tee_location.write(Location(x=0, y=0, z=0))
+    hole_location.write(Location(x=10, y=10, z=10))
     return ()
 end
-
-#######
-# VIEWS
-#######
 
 # @view
 # func get_attempts{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -115,12 +55,9 @@ end
 #     return (
 # end
 
-###########
-# EXTERNALS
-###########
-
 @external
-func approach_tee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (attempt_cnt : felt):
+func approach_tee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (attempt_cnt : felt):
     let (caller_addr) = get_caller_address()
     let (attempt_cnt) = players.read(address=caller_addr)
     players.write(caller_addr, attempt_cnt + 1)
@@ -132,61 +69,64 @@ end
 func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         attempt_id : felt,
         power : felt,
-        direction : ShotDirection
-    ):
+        direction : SwingDirection
+    ) -> ():
     alloc_locals
 
     let (local caller_addr : felt) = get_caller_address()
-    _assert_valid_attempt(player_addr=caller_addr, attempt_id=attempt_id)
 
-    let player_attempt_key = PlayerAttempt(addr=caller_addr, attempt_id=attempt_id)
-    let (attempt) = attempts.read(player_attempt_key)
-
-    # Get last ball location
-    if attempt.shot_cnt == 0:
-        let (last_loc) = tee_location.read()
-    else:
-        let (last_loc) = shots.read(PlayerShot(addr=caller_addr, attempt_id=attempt_id, shot_id=attempt.shot_cnt - 1))
-    end
-
-    # Get new ball location
-    local new_loc : Location* = new Location(x=last_loc.x + 1, y=last_loc.y + 1, z=0)
-
-    # Increase shot count
-    attempts.write(
-        player_attempt_key, 
-        AttemptInfo(shot_cnt=attempt.shot_cnt + 1, status=attempt.status))
-
-    # Store shot info
-    shots.write(
-        PlayerShot(addr=caller_addr, attempt_id=attempt_id, shot_id=attempt.shot_cnt),
-        Location(x=1, y=1, z=1))
-
-    return ()
-end
-
-#############
-# VALIDATIONS
-#############
-
-func _assert_valid_attempt{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        player_addr : felt,
-        attempt_id : felt
-    ):
-    let (attempt_cnt) = players.read(address=player_addr)
+    # Assert attempt id is valid
+    let (attempt_cnt) = players.read(address=caller_addr)
     with_attr error_message("Attempt ID does not exist"):
         assert_le(0, attempt_id)
         assert_lt(attempt_id, attempt_cnt)
     end
 
-    let (attempt) = attempts.read(PlayerAttempt(addr=player_addr, attempt_id=attempt_id))
+    # Assert attempt is not finished
+    let player_attempt_key = PlayerAttempt(addr=caller_addr, attempt_id=attempt_id)
+    let (attempt) = attempts.read(player_attempt_key)
+    let (last_loc) = _get_last_location(player_addr=caller_addr, attempt_id=attempt_id, swing_cnt=attempt.swing_cnt)
+    let (hole_loc) = hole_location.read()
     with_attr error_message("This attempt has ended"):
-        assert attempt.status = AttemptStatusEnum.PLAYING
+        assert_not_zero(hole_loc.x - last_loc.x)
+        assert_not_zero(hole_loc.y - last_loc.y)
+        assert_not_zero(hole_loc.z - last_loc.z)
     end
+
+    # Get new ball location
+    # Possible pattern: call contract_interface to contract that contains physics engines
+    let (new_loc) = _physics_engine(last_loc=last_loc)
+
+    # Increase swing count
+    attempts.write(
+        player_attempt_key, 
+        AttemptInfo(swing_cnt=attempt.swing_cnt + 1, status=attempt.status))
+
+    # Store swing info
+    swings.write(
+        PlayerSwing(addr=caller_addr, attempt_id=attempt_id, swing_id=attempt.swing_cnt),
+        Location(x=new_loc.x, y=new_loc.y, z=new_loc.z))
 
     return ()
 end
 
-###########
-# INTERNALS
-###########
+func _get_last_location{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        player_addr : felt,
+        attempt_id : felt,
+        swing_cnt : felt
+    ) -> (last_loc : Location):
+    if swing_cnt == 0:
+        let (last_loc) = tee_location.read()
+        return (last_loc)
+    else:
+        let (last_loc) = swings.read(PlayerSwing(addr=player_addr, attempt_id=attempt_id, swing_id=swing_cnt - 1))
+        return (last_loc)
+    end
+end
+
+func _physics_engine{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        last_loc : Location
+    ) -> (new_loc : Location):
+
+    return (Location(x=last_loc.x, y=last_loc.y, z=last_loc.z))
+end
