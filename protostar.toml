@@ -8,3 +8,9 @@ libs_path = "lib"
 hole0 = [
     "src/hole0.cairo",
 ]
+
+["protostar.build"]
+cairo-path = ["./lib/cairo_math_64x61/contracts"]
+
+["protostar.test"]
+cairo-path = ["./lib/cairo_math_64x61/contracts"]
