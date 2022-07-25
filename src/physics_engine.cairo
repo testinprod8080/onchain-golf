@@ -14,10 +14,20 @@ from src.structs import (
 )
 
 const FP = 10 ** 12
-const RANGE_CHECK_BOUND = 2 ** 64
+const RANGE_CHECK_BOUND = 2 ** 125
 const ONE = 1 * FP
-const PI = 7244019458077122842 # TODO verify this
-const HALF_PI = 3622009729038561421 # TODO verify this
+const PI = 3141590000000
+const HALF_PI = 1570795000000
+# const PI = 7244019458077122842 # TODO verify this
+# const HALF_PI = 3622009729038561421 # TODO verify this
+
+# TODO Try these
+# how long to stop? v_f = v_0 + a * t
+#   where v_f = 0, v = P / F
+# how far til stops? v_f^2 = v_0 + 2 * a_x * dist
+#   where v_f = 0, v = P / F
+# a_x = mu * g
+#   where mu = friction coefficient, g = gravity
 
 # TODO refactor as @contract_interface
 func get_new_location{range_check_ptr}(
@@ -41,9 +51,9 @@ func get_new_location{range_check_ptr}(
     # |/T _ _ _ hypotenuse of x and y
     # tan(T) = opposite / adjacent
     let (adjacent_side) = sqrt((unit_vector.x * unit_vector.x) + (unit_vector.y * unit_vector.y))
-    let (local launch_angle) = _atan( unit_vector.z / adjacent_side ) # radians
-    let (cos_launch_angle) = _cos(launch_angle)
-    let (sin_launch_angle) = _sin(launch_angle)
+    let (local launch_angle) = atan( unit_vector.z / adjacent_side ) # radians
+    let (cos_launch_angle) = cos(launch_angle)
+    let (sin_launch_angle) = sin(launch_angle)
 
     # get velocity magnitude
     # v = P / F
@@ -60,9 +70,9 @@ func get_new_location{range_check_ptr}(
     # | /
     # |/a _ _ _ x
     # tan(a) = opposite / adjacent
-    let (local yaw_angle) = _atan( unit_vector.y / unit_vector.x ) # radians
-    let (cos_yaw_angle) = _cos(yaw_angle)
-    let (sin_yaw_angle) = _sin(yaw_angle)
+    let (local yaw_angle) = atan( unit_vector.y / unit_vector.x ) # radians
+    let (cos_yaw_angle) = cos(yaw_angle)
+    let (sin_yaw_angle) = sin(yaw_angle)
 
     # get velocity x and y components
     # v_x = v_adj * cos(a)
@@ -83,23 +93,7 @@ func get_new_location{range_check_ptr}(
     return (Location(x=x, y=y, z=0))
 end
 
-func _get_launch_angle{range_check_ptr}(
-        unit_vector : SwingDirection
-    ) -> (angle : felt):
-    # get angle of launch from ground
-    # side view
-    # z
-    # |  o    
-    # | /
-    # |/T _ _ _ hypotenuse of x and y
-    # tan(T) = opposite / adjacent
-    let (adjacent_side) = sqrt((unit_vector.x * unit_vector.x) + (unit_vector.y * unit_vector.y))
-    # let (launch_angle) = _atan( unit_vector.z / adjacent_side ) # radians
-    # return (launch_angle)
-    return (unit_vector.z / adjacent_side)
-end
-
-func _mul{range_check_ptr}(
+func mul{range_check_ptr}(
         a : felt,
         b : felt
     ) -> (c : felt):
@@ -107,7 +101,7 @@ func _mul{range_check_ptr}(
     return (c)
 end
 
-func _div {range_check_ptr} (
+func div{range_check_ptr} (
         a : felt,
         b : felt
     ) -> (c : felt):
@@ -115,14 +109,14 @@ func _div {range_check_ptr} (
     return (c)
 end
 
-func _assert_inbound{range_check_ptr}(x : felt):
+func assert_inbound{range_check_ptr}(x : felt):
     assert_le(x, RANGE_CHECK_BOUND)
     assert_le(-RANGE_CHECK_BOUND, x)
     return ()
 end
 
 # Helper function to calculate Taylor series for sin
-func _recursive_sin{range_check_ptr} (
+func recursive_sin{range_check_ptr} (
         x : felt, 
         i : felt, 
         acc : felt
@@ -133,15 +127,15 @@ func _recursive_sin{range_check_ptr} (
         return (acc)
     end
 
-    let (num) = _mul(x, x)
-    tempvar div = (2 * i + 2) * (2 * i + 3) * FP
-    let (t) = _div(num, div)
-    let (t_acc) = _mul(t, acc)
-    let (next) = _recursive_sin(x, i - 1, ONE - t_acc)
+    let (num) = mul(x, x)
+    tempvar divisor = (2 * i + 2) * (2 * i + 3) * FP
+    let (t) = div(num, divisor)
+    let (t_acc) = mul(t, acc)
+    let (next) = recursive_sin(x, i - 1, ONE - t_acc)
     return (next)
 end
 
-func _sin{range_check_ptr}(
+func sin{range_check_ptr}(
         x : felt
     ) -> (res : felt):
     alloc_locals
@@ -151,29 +145,32 @@ func _sin{range_check_ptr}(
     let (_, x1) = unsigned_div_rem(abs1, 2 * PI)
     let (rem, x2) = unsigned_div_rem(x1, PI)
     local _sign2 = 1 - (2 * rem)
-    let (acc) = _recursive_sin(x2, 6, ONE)
-    let (res2) = _mul(x2, acc)
+    let (acc) = recursive_sin(x2, 6, ONE)
+    let (res2) = mul(x2, acc)
     local res = res2 * _sign1 * _sign2
-    _assert_inbound(res)
+    assert_inbound(res)
     return (res)
 end
 
-func _cos{range_check_ptr}(
+func cos{range_check_ptr}(
         x : felt
     ) -> (res : felt):
     tempvar shifted = HALF_PI - x
-    let (res) = _sin(shifted)
+    let (res) = sin(shifted)
     return (res)
 end
 
-func _atan{range_check_ptr}(
+func atan{range_check_ptr}(
         x : felt
     ) -> (res : felt):
     alloc_locals
 
-    const sqrt3_3 = 1331279082078542925 # sqrt(3) / 3
-    const pi_6 = 1207336576346187140 # pi / 6
-    const p_7 = 1614090106449585766 # 0.7
+    # const sqrt3_3 = 1331279082078542925 # sqrt(3) / 3
+    # const pi_6 = 1207336576346187140 # pi / 6
+    # const p_7 = 1614090106449585766 # 0.7
+    const sqrt3_3 = 333333333333 # sqrt(3) / 3
+    const pi_6 = 523598333333333333333333 # pi / 6
+    const p_7 = 7000000000000 # 0.7
     
     # Calculate on positive values and re-assign later
     let (_sign) = sign(x)
@@ -183,15 +180,15 @@ func _atan{range_check_ptr}(
     let (_invert) = is_le(ONE, abs_x)
     local x1a_num = abs_x * (1 - _invert) + _invert * ONE
     tempvar x1a_div = abs_x * _invert + ONE - ONE * _invert
-    let (x1a) = _div(x1a_num, x1a_div)
+    let (x1a) = div(x1a_num, x1a_div)
 
     # Account for lack of precision in polynomaial when x > 0.7
     let (_shift) = is_le(p_7, x1a)
     local b = sqrt3_3 * _shift + ONE - _shift * ONE
     local x1b_num = x1a - b
-    let (x1b_div_2) = _mul(x1a, b)
+    let (x1b_div_2) = mul(x1a, b)
     tempvar x1b_div = ONE + x1b_div_2
-    let (x1b) = _div(x1b_num, x1b_div)
+    let (x1b) = div(x1b_num, x1b_div)
     local x1 = x1a * (1 - _shift) + x1b * _shift
 
     # 6.769e-8 maximum error
@@ -204,19 +201,19 @@ func _atan{range_check_ptr}(
     const a7 = -506263448524254433
     const a8 = 114871904819177193
     
-    let (r8) = _mul(a8, x1)
-    let (r7) = _mul(r8 + a7, x1)
-    let (r6) = _mul(r7 + a6, x1)
-    let (r5) = _mul(r6 + a5, x1)
-    let (r4) = _mul(r5 + a4, x1)
-    let (r3) = _mul(r4 + a3, x1)
-    let (r2) = _mul(r3 + a2, x1)
+    let (r8) = mul(a8, x1)
+    let (r7) = mul(r8 + a7, x1)
+    let (r6) = mul(r7 + a6, x1)
+    let (r5) = mul(r6 + a5, x1)
+    let (r4) = mul(r5 + a4, x1)
+    let (r3) = mul(r4 + a3, x1)
+    let (r2) = mul(r3 + a2, x1)
     tempvar z1 = r2 + a1
 
     # Adjust for sign change, inversion, and shift
     tempvar z2 = z1 + (pi_6 * _shift)
     tempvar z3 = (z2 - (HALF_PI * _invert)) * (1 - _invert * 2)
     local res = z3 * _sign
-    _assert_inbound(res)
+    assert_inbound(res)
     return (res)
 end
