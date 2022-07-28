@@ -46,7 +46,7 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    hole_location.write(Location(x=10, y=10, z=10))
+    hole_location.write(Location(x=1417233560090700, y=0, z=0))
     return ()
 end
 
@@ -104,6 +104,7 @@ func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     alloc_locals
 
     # TODO assert valid golf club
+    # TODO assert swing_force is between 0 and TBD max number
 
     let (local caller_addr : felt) = get_caller_address()
 
@@ -111,8 +112,8 @@ func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 
     # get ball's last location
     let player_attempt_key = PlayerAttempt(addr=caller_addr, attempt_id=attempt_id)
-    let (swing_cnt) = swings.read(player_attempt_key)
-    let (last_loc) = _get_last_location(player_addr=caller_addr, attempt_id=attempt_id, swing_cnt=swing_cnt)
+    let (curr_swing_cnt) = swings.read(player_attempt_key)
+    let (last_loc) = _get_last_location(player_addr=caller_addr, attempt_id=attempt_id, swing_cnt=curr_swing_cnt)
     
     _assert_attempt_not_finished(last_loc=last_loc)
 
@@ -120,11 +121,11 @@ func swing{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (new_loc) = get_new_location(last_loc=last_loc, swing_power=swing_power, swing_force=swing_force, unit_vector=direction)
 
     # increase swing count
-    swings.write(player_attempt_key, swing_cnt + 1)
+    swings.write(player_attempt_key, curr_swing_cnt + 1)
 
     # store new location
     ball_locations.write(
-        PlayerSwing(addr=caller_addr, attempt_id=attempt_id, swing_id=swing_cnt - 1),
+        PlayerSwing(addr=caller_addr, attempt_id=attempt_id, swing_id=curr_swing_cnt),
         Location(x=new_loc.x, y=new_loc.y, z=new_loc.z))
 
     return (new_loc)
@@ -152,9 +153,7 @@ func _assert_attempt_not_finished{syscall_ptr : felt*, pedersen_ptr : HashBuilti
     ) -> ():
     let (hole_loc) = hole_location.read()
     with_attr error_message("This attempt has ended"):
-        assert_not_zero(hole_loc.x - last_loc.x)
-        assert_not_zero(hole_loc.y - last_loc.y)
-        assert_not_zero(hole_loc.z - last_loc.z)
+        assert_not_zero(hole_loc.x + hole_loc.y + hole_loc.z - last_loc.x - last_loc.y - last_loc.z)
     end
 
     return ()
@@ -189,8 +188,7 @@ func _get_last_location{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         swing_cnt : felt
     ) -> (last_loc : Location):
     if swing_cnt == 0:
-        let last_loc = Location(x=TEE_LOCATION_X, y=TEE_LOCATION_Y, z=TEE_LOCATION_Z)
-        return (last_loc)
+        return (Location(x=TEE_LOCATION_X, y=TEE_LOCATION_Y, z=TEE_LOCATION_Z))
     else:
         let (last_loc) = ball_locations.read(PlayerSwing(addr=player_addr, attempt_id=attempt_id, swing_id=swing_cnt - 1))
         return (last_loc)

@@ -17,6 +17,8 @@ const FP = 10 ** 12
 const RANGE_CHECK_BOUND = 2 ** 125
 
 # TODO refactor as @contract_interface
+# @notice contains physics engine to calculate new location of ball
+# @dev 
 func get_new_location{range_check_ptr}(
         last_loc : Location,
         swing_power : felt,
@@ -26,11 +28,11 @@ func get_new_location{range_check_ptr}(
 
     alloc_locals
 
-    # physics engine is for Earth-like physics on flat land
-    # distance base unit is millimeters (mm)
-    let gravity = -98 * FP / 10
+    # based on -9.8 m/s^2 Earth gravity
+    # to keep cairo math simple, deceleration is a positive number
+    let gravity = 98 * FP / 10
 
-    # friction coefficient
+    # ground friction coefficient
     let mu = 27 * FP / 100
 
     # acceleration
@@ -40,13 +42,14 @@ func get_new_location{range_check_ptr}(
     #   where P is power, F is force
     let (v_init) = div(swing_power, swing_force)
 
-    # v_f^2 = v_0 + 2 * a_x * dist
-    #   where v_f = 0, v_0 = P / F
-    let (denominator) = mul(2, a_x)
-    let (dist) = div(v_init, denominator)
+    # v_f^2 = v_init^2 + 2 * a_x * dist
+    #   where v_f = 0, v_init = P / F
+    let denominator = 2 * a_x
+    let (numerator) = mul(v_init, v_init)
+    let (dist) = div(numerator, denominator)
 
     # get final position
-    let x_final = dist + last_loc.x
+    let x_final = last_loc.x + dist
 
     return (Location(x=x_final, y=0, z=0))
 end

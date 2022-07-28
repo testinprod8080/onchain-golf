@@ -4,7 +4,7 @@ from src.hole0 import (
     get_attempt_info, 
     get_hole_location, 
     approach_tee, 
-    swing, 
+    swing,
     _get_last_location
 )
 from src.structs import GolfClubEnum
@@ -37,41 +37,62 @@ func test_fail_attempt_id_dne{syscall_ptr : felt*, range_check_ptr, pedersen_ptr
     return ()
 end
 
-# @external
-# func test_success_swing{syscall_ptr : felt*, range_check_ptr, pedersen_ptr : HashBuiltin*}():
-#     alloc_locals
-#     local contract_address
-#     %{ stop_prank_callable = start_prank(123) %}
-#     approach_tee()
-#     let (new_loc) = swing(attempt_id=0, golf_club=GolfClubEnum.DRIVER, swing_force=100, direction=SwingDirection(x=1, y=0, z=1))
+@external
+func test_success_swing{syscall_ptr : felt*, range_check_ptr, pedersen_ptr : HashBuiltin*}():
+    %{ stop_prank_callable = start_prank(123) %}
+    approach_tee()
 
-#     %{ 
-#         print("result: [" + str(ids.new_loc.x) + ", " + str(ids.new_loc.y) + ", " + str(ids.new_loc.z) + "]")
-#         stop_prank_callable() 
-#     %}
+    let (new_loc) = swing(
+        attempt_id=0, 
+        golf_club=GolfClubEnum.DRIVER, 
+        swing_force=20, 
+        direction=SwingDirection(x=1, y=0, z=0))
 
-#     return ()
-# end
+    %{ stop_prank_callable() %}
 
-# @external
-# func test_success_in_the_hole{syscall_ptr : felt*, range_check_ptr, pedersen_ptr : HashBuiltin*}():
-#     %{ stop_prank_callable = start_prank(123) %}
-#     approach_tee()
-#     swing(attempt_id=0, golf_club=GolfClubEnum.DRIVER, swing_force=5, direction=SwingDirection(x=1, y=1, z=1))
-#     swing(attempt_id=0, golf_club=GolfClubEnum.DRIVER, swing_force=4, direction=SwingDirection(x=1, y=1, z=1))
-#     swing(attempt_id=0, golf_club=GolfClubEnum.DRIVER, swing_force=1, direction=SwingDirection(x=1, y=1, z=1))
+    assert new_loc.x = 472411186696900
+    assert new_loc.y = 0
+    assert new_loc.z = 0
 
-#     let (swings_arr_len, swings_arr) = get_attempt_info(attempt_id=0)
+    return ()
+end
 
-#     %{ stop_prank_callable() %}
+@external
+func test_success_in_the_hole{syscall_ptr : felt*, range_check_ptr, pedersen_ptr : HashBuiltin*}():
+    alloc_locals
 
-#     let (hole_loc) = get_hole_location()
-#     assert swings_arr[swings_arr_len - 1].x = hole_loc.x
-#     assert swings_arr[swings_arr_len - 1].y = hole_loc.y
-#     assert swings_arr[swings_arr_len - 1].z = hole_loc.z
+    %{ stop_prank_callable = start_prank(123) %}
 
-#     return ()
-# end
+    # act
+    approach_tee()
+    swing(
+        attempt_id=0, 
+        golf_club=GolfClubEnum.DRIVER, 
+        swing_force=20, 
+        direction=SwingDirection(x=1, y=0, z=0))
+    swing(
+        attempt_id=0, 
+        golf_club=GolfClubEnum.DRIVER, 
+        swing_force=20, 
+        direction=SwingDirection(x=1, y=0, z=0))
+    swing(
+        attempt_id=0, 
+        golf_club=GolfClubEnum.DRIVER, 
+        swing_force=20, 
+        direction=SwingDirection(x=1, y=0, z=0))
+
+    %{ stop_prank_callable() %}
+
+    # assert
+    let (local swings_arr_len, local swings_arr) = get_attempt_info(attempt_id=0)
+    let swings = &swings_arr[2]
+    let (hole_loc) = get_hole_location()
+    assert swings.x = hole_loc.x
+    assert swings.y = hole_loc.y
+    assert swings.z = hole_loc.z
+
+    return ()
+end
 
 # TEST - _get_last_location
 
