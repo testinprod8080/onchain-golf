@@ -8,3 +8,6 @@ libs_path = "lib"
 hole0 = [
     "src/hole0.cairo",
 ]
+
+["protostar.shared_command_configs"]
+stdout-on-success = true
