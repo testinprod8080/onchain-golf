@@ -89,7 +89,9 @@ func test_success_in_the_hole{syscall_ptr : felt*, range_check_ptr, pedersen_ptr
     let (hole_loc) = get_hole_location()
     let swing_loc_sum = swings.x + swings.y + swings.z
     let hole_loc_sum = hole_loc.x + hole_loc.y + hole_loc.z
-    assert swing_loc_sum = hole_loc_sum
+    assert swings.x = hole_loc.x
+    assert swings.y = hole_loc.y
+    assert swings.z = hole_loc.z
 
     return ()
 end

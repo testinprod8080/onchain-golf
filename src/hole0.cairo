@@ -152,6 +152,7 @@ func _assert_attempt_not_finished{syscall_ptr : felt*, pedersen_ptr : HashBuilti
         last_loc : Location
     ) -> ():
     let (hole_loc) = hole_location.read()
+    # TODO add tolerance of .05m for hole radius
     with_attr error_message("This attempt has ended"):
         assert_not_zero(hole_loc.x + hole_loc.y + hole_loc.z - last_loc.x - last_loc.y - last_loc.z)
     end
